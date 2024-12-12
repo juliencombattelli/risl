@@ -1,13 +1,9 @@
 use clap::{arg, command, Args, Parser};
-use std::error::Error;
 use std::fs;
 use std::io::{self, BufRead, Write};
 
 #[derive(Parser, Debug)]
 struct Cli {
-    #[arg(short, long)]
-    /// Run interactivelly after executing the input script, if any
-    interactive: bool,
     #[command(flatten)]
     input: Input,
     /// Arguments passed to the script
@@ -25,11 +21,24 @@ struct Input {
     #[arg(short, long)]
     /// Read the program from stdin
     stdin: bool,
+    #[arg(short, long)]
+    /// Run interactivelly
+    interactive: bool,
 }
 
-fn run_file(path: &String) -> Result<(), Box<dyn Error>> {
-    let program = fs::read_to_string(path)?;
-    run(&program)
+fn run_file(path: &String) -> Result<(), exitcode::ExitCode> {
+    let program = match fs::read_to_string(path) {
+        Ok(program) => program,
+        Err(err) => {
+            let exit_code = match err.kind() {
+                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => exitcode::NOINPUT,
+                _ => exitcode::IOERR,
+            };
+            eprintln!("Cannot read input file '{path}': {err}");
+            return Err(exit_code);
+        }
+    };
+    run(&program).map_err(|_| exitcode::SOFTWARE)
 }
 
 fn print_prompt() {
@@ -37,18 +46,25 @@ fn print_prompt() {
     io::stdout().flush().unwrap();
 }
 
-fn run_interactive() -> Result<(), Box<dyn Error>> {
+fn run_interactive() -> Result<(), exitcode::ExitCode> {
     // TODO handle multiline statements
     print_prompt();
     for line in io::stdin().lock().lines() {
-        let statement = line?;
-        run(&statement)?;
-        print_prompt();
+        match line {
+            Ok(line) => {
+                run(&line)?;
+                print_prompt();
+            }
+            Err(err) => {
+                eprintln!("Error reading input: {err}");
+                return Err(exitcode::IOERR);
+            }
+        }
     }
     Ok(())
 }
 
-fn run(program: &String) -> Result<(), Box<dyn Error>> {
+fn run(program: &String) -> Result<(), exitcode::ExitCode> {
     println!("INFO: Running program '{}'", program);
     Ok(())
 }
@@ -63,8 +79,15 @@ fn run(program: &String) -> Result<(), Box<dyn Error>> {
 //     }
 //   }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let args = Cli::parse();
+fn parse_args() -> Result<Cli, exitcode::ExitCode> {
+    Cli::try_parse().map_err(|err| {
+        let _ = err.print();
+        exitcode::USAGE
+    })
+}
+
+fn try_main() -> Result<(), exitcode::ExitCode> {
+    let args = parse_args()?;
 
     let input = &args.input;
     if let Some(file) = &input.file {
@@ -73,11 +96,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         run(&command)?;
     } else if input.stdin {
         todo!();
-    }
-
-    if args.interactive {
+    } else if input.interactive {
         run_interactive()?;
     }
 
     Ok(())
+}
+
+fn main() {
+    let exit_code = match try_main() {
+        Ok(_) => exitcode::OK,
+        Err(exit_code) => exit_code,
+    };
+    std::process::exit(exit_code);
 }
