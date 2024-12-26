@@ -1,150 +1,23 @@
-use std::fs;
-use std::io::{self, BufRead, Write};
-
-/// Utility macro to create Vec<String> from &str slices
-macro_rules! str_vec {
-    () => (
-        $crate::vec::Vec::<String>::new()
-    );
-    ($($x:expr),+ $(,)?) => (
-        [$($x),+].map(String::from).to_vec()
-    );
-}
-
-fn run_file(path: &String) -> Result<(), exitcode::ExitCode> {
-    let program = match fs::read_to_string(path) {
-        Ok(program) => program,
-        Err(err) => {
-            let exit_code = match err.kind() {
-                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => exitcode::NOINPUT,
-                _ => exitcode::IOERR,
-            };
-            eprintln!("Cannot read input file '{path}': {err}");
-            return Err(exit_code);
-        }
-    };
-    run(&program).map_err(|_| exitcode::SOFTWARE)
-}
-
-fn print_prompt() {
-    print!("> ");
-    io::stdout().flush().unwrap();
-}
-
-fn run_interactive() -> Result<(), exitcode::ExitCode> {
-    // TODO handle multiline statements
-    print_prompt();
-    for line in io::stdin().lock().lines() {
-        match line {
-            Ok(line) => {
-                run(&line)?;
-                print_prompt();
-            }
-            Err(err) => {
-                eprintln!("Error reading input: {err}");
-                return Err(exitcode::IOERR);
-            }
-        }
-    }
-    Ok(())
-}
-
-fn run(program: &String) -> Result<(), exitcode::ExitCode> {
-    println!("INFO: Running program '{}'", program);
-    Ok(())
-}
-
-// private static void run(String source) {
-//     Scanner scanner = new Scanner(source);
-//     List<Token> tokens = scanner.scanTokens();
-//
-//     // For now, just print the tokens.
-//     for (Token token : tokens) {
-//       System.out.println(token);
-//     }
-//   }
-
-const USAGE: &'static str = "
-Usage:
-  risl [-hiv] [ --command=<command> | <file> | --stdin ] [ [--] <arguments>... ]
-
-Options:
-  -h --help                 Show this screen.
-  -v --version              Show version.
-  -i --interactive          Run interactivelly.
-  -s --stdin                Read program from the standard input.
-  -c --command <command>    Read program from the <command> string.
-";
-
-#[derive(Debug, PartialEq)]
-enum Error {
-    HelpRequested,
-    MissingArgValue(String),
-    UnexpectedArgs(Vec<String>),
-    ConflictingArgs(Vec<String>),
-}
-
-impl Error {
-    fn format_unexpected_args(args: &Vec<String>, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if args.len() == 0 {
-            panic!("Error::UnexpectedArgs must contain at least one argument");
-        } else if args.len() == 1 {
-            write!(f, "unexpected argument '{}' found", args[0])
-        } else {
-            write!(f, "unexpected arguments found: '{}'", args.join("', '"))
-        }
-    }
-
-    fn format_conflicting_args(
-        args: &Vec<String>,
-        f: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result {
-        if args.len() < 2 {
-            panic!("Error::ConflictingArgs must contain at least two arguments");
-        } else if args.len() == 2 {
-            write!(
-                f,
-                "the argument '{}' cannot be used with '{}'",
-                args[0], args[1]
-            )
-        } else {
-            write!(
-                f,
-                "the argument '{}' cannot be used with:\n  {}",
-                args[0],
-                args[1..].join("\n  "),
-            )
-        }
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Error::UnexpectedArgs(args) => Self::format_unexpected_args(&args, f),
-            Error::ConflictingArgs(args) => Self::format_conflicting_args(&args, f),
-            _ => Ok(()),
-        }
-    }
-}
+use crate::cli::error::Error;
+use crate::cli::utils::str_vec;
 
 #[derive(Debug, Default, PartialEq)]
-struct Args {
-    input_file: Option<String>,
-    input_command: Option<String>,
-    input_is_stdin: bool,
-    interactive: bool,
-    help: bool,
-    version: bool,
-    script_arguments: Vec<String>,
+pub struct Args {
+    pub input_file: Option<String>,
+    pub input_command: Option<String>,
+    pub input_is_stdin: bool,
+    pub interactive: bool,
+    pub help: bool,
+    pub version: bool,
+    pub script_arguments: Vec<String>,
 }
 
 impl Args {
-    fn parse() -> Result<Args, Error> {
+    pub fn parse() -> Result<Args, Error> {
         Self::parse_from(std::env::args())
     }
 
-    fn parse_from<I, T>(iter: I) -> Result<Args, Error>
+    pub fn parse_from<I, T>(iter: I) -> Result<Args, Error>
     where
         I: IntoIterator<Item = T>,
         T: Into<String> + Clone,
@@ -240,43 +113,8 @@ impl Args {
     }
 }
 
-fn try_main() -> Result<(), exitcode::ExitCode> {
-    let args = Args::parse().map_err(|err| match err {
-        Error::HelpRequested => {
-            print!("{}", USAGE);
-            exitcode::OK
-        }
-        _ => {
-            println!("Error: {}", err);
-            print!("{}", USAGE);
-            exitcode::USAGE
-        }
-    })?;
-    println!("{:?}", args);
-
-    // if let Some(file) = &args.arg_file {
-    //     run_file(&file)?;
-    // } else if let Some(command) = &args.flag_command {
-    //     run(&command)?;
-    // } else if args.flag_stdin {
-    //     todo!();
-    // } else if args.flag_interactive {
-    //     run_interactive()?;
-    // }
-
-    Ok(())
-}
-
-fn main() {
-    let exit_code = match try_main() {
-        Ok(_) => exitcode::OK,
-        Err(exit_code) => exit_code,
-    };
-    std::process::exit(exit_code);
-}
-
 #[cfg(test)]
-mod cli_tests {
+mod tests {
     use super::*;
 
     mod options {
@@ -405,7 +243,7 @@ mod cli_tests {
         }
     }
 
-    mod forwarded_arguments {
+    mod forwarded_args {
         use super::*;
 
         #[test]

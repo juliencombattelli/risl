@@ -9,4 +9,3 @@ exitcode = "1.1.2"
 [[bin]]
 # The Risl interpreter
 name = "risl"
-path = "src/cli/main.rs"
