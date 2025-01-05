@@ -1,7 +1,7 @@
 mod cli;
 
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, ErrorKind, Write};
 
 use crate::cli::args::Args;
 use crate::cli::error::Error;
@@ -11,7 +11,7 @@ fn run_file(path: &String) -> Result<(), exitcode::ExitCode> {
         Ok(program) => program,
         Err(err) => {
             let exit_code = match err.kind() {
-                io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied => exitcode::NOINPUT,
+                ErrorKind::NotFound | ErrorKind::PermissionDenied => exitcode::NOINPUT,
                 _ => exitcode::IOERR,
             };
             eprintln!("Cannot read input file '{path}': {err}");
@@ -21,19 +21,29 @@ fn run_file(path: &String) -> Result<(), exitcode::ExitCode> {
     run(&program).map_err(|_| exitcode::SOFTWARE)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum IsInteractive {
+    No,
+    Yes,
+}
+
 fn print_prompt() {
     print!("> ");
     io::stdout().flush().unwrap();
 }
 
-fn run_interactive() -> Result<(), exitcode::ExitCode> {
+fn run_from_stdin(is_interactive: IsInteractive) -> Result<(), exitcode::ExitCode> {
     // TODO handle multiline statements
-    print_prompt();
+    if is_interactive == IsInteractive::Yes {
+        print_prompt();
+    }
     for line in io::stdin().lock().lines() {
         match line {
             Ok(line) => {
                 run(&line)?;
-                print_prompt();
+                if is_interactive == IsInteractive::Yes {
+                    print_prompt();
+                }
             }
             Err(err) => {
                 eprintln!("Error reading input: {err}");
@@ -90,11 +100,11 @@ fn try_main() -> Result<(), exitcode::ExitCode> {
     } else if let Some(command) = &args.input_command {
         run(&command)?;
     } else if args.input_is_stdin {
-        todo!();
+        run_from_stdin(IsInteractive::No)?;
     }
 
     if args.interactive {
-        run_interactive()?;
+        run_from_stdin(IsInteractive::Yes)?;
     }
 
     Ok(())
