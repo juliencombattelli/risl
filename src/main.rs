@@ -1,4 +1,5 @@
 mod cli;
+mod tokenizer;
 
 use std::fs;
 use std::io::{self, BufRead, ErrorKind, Write};
