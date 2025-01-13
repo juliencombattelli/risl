@@ -11,14 +11,14 @@ pub enum Token<'source> {
     Dot,
     Minus,
     Plus,
+    Colon,
     Semicolon,
     Slash,
     Backslash,
     Star,
-
-    // One or two character tokens
     Ampersand,
     Pipe,
+    // One or two character tokens
     Not,
     NotEqual,
     Equal,
@@ -27,12 +27,10 @@ pub enum Token<'source> {
     GreaterEqual,
     Less,
     LessEqual,
-
     // Literals
     Identifier(&'source str),
     String(&'source str),
     Number(i64),
-
     // Keywords
     And,
     Break,
@@ -59,7 +57,6 @@ pub enum Token<'source> {
     This,
     True,
     While,
-
     // Others
     Eof,
 }
@@ -75,17 +72,18 @@ pub struct Error {
 // let tokens = tokenize("let answer = 42;");
 // Pros: Interface is simple, implementation is verbose but simple
 // Cons: Vec<> usage is forced
+// Based on https://brunocalza.me/writing-a-simple-lexer-in-rust/
 mod manual_loop {
     use super::{Error, Token};
     use std::iter::{self, from_fn};
 
     pub fn tokenize(source: &str) -> Result<Vec<Token>, Error> {
         let mut tokens: Vec<Token> = Vec::new();
-        let mut iter = source.chars().peekable();
+        let mut iter = source.char_indices().peekable();
         let mut line: u64 = 0;
         let mut column: u64 = 0;
 
-        while let Some(ch) = iter.next() {
+        while let Some((index, ch)) = iter.next() {
             column += 1;
             match ch {
                 ch if ch.is_whitespace() => match ch {
@@ -95,30 +93,83 @@ mod manual_loop {
                     }
                     _ => {}
                 },
+                // Single-character tokens
                 '(' => tokens.push(Token::LeftParen),
                 ')' => tokens.push(Token::RightParen),
+                '{' => tokens.push(Token::LeftBrace),
+                '}' => tokens.push(Token::RightBrace),
+                '[' => tokens.push(Token::LeftBracket),
+                ']' => tokens.push(Token::RightBracket),
+                ',' => tokens.push(Token::Comma),
+                '.' => tokens.push(Token::Dot),
+                '-' => tokens.push(Token::Minus),
+                '+' => tokens.push(Token::Plus),
+                ':' => tokens.push(Token::Colon),
+                ';' => tokens.push(Token::Semicolon),
+                '/' => tokens.push(Token::Slash),
+                '\\' => tokens.push(Token::Backslash),
+                '*' => tokens.push(Token::Star),
+                '&' => tokens.push(Token::Ampersand),
+                '|' => tokens.push(Token::Pipe),
+                // One or two character tokens
                 '!' => match iter.peek() {
-                    Some('=') => {
+                    Some((_, '=')) => {
                         iter.next();
                         tokens.push(Token::NotEqual)
                     }
                     _ => tokens.push(Token::Not),
                 },
                 '=' => match iter.peek() {
-                    Some('=') => {
+                    Some((_, '=')) => {
                         iter.next();
                         tokens.push(Token::EqualEqual)
                     }
-                    _ => tokens.push(Token::Not),
+                    _ => tokens.push(Token::Equal),
                 },
+                '>' => match iter.peek() {
+                    Some((_, '=')) => {
+                        iter.next();
+                        tokens.push(Token::GreaterEqual)
+                    }
+                    _ => tokens.push(Token::Greater),
+                },
+                '<' => match iter.peek() {
+                    Some((_, '=')) => {
+                        iter.next();
+                        tokens.push(Token::LessEqual)
+                    }
+                    _ => tokens.push(Token::Less),
+                },
+                // Literals
                 '1'..='9' => {
-                    let n: i64 = iter::once(ch)
-                        .chain(from_fn(|| iter.by_ref().next_if(|s| s.is_ascii_digit())))
-                        .collect::<String>()
-                        .parse()
-                        .unwrap();
-
-                    tokens.push(Token::Number(n));
+                    let start_index = index;
+                    // Extract number literals
+                    // _ is accepted as digit separator
+                    // integers:
+                    //   can be prefixed by a base (0x, 0o or 0b)
+                    //   can be suffixed by a type ({u,i}{8,16,32,64})
+                    // floats:
+                    //   {integer part}.{decimal part}
+                    //   e-notation: 1e6, 7.6e-4
+                    //   can be suffixed by a type (f{32,64})
+                    match iter
+                        .by_ref()
+                        .take_while(|&(_index, ch)| /*TODO add all cases*/ ch.is_ascii_digit())
+                        .last()
+                    {
+                        Some((index, _ch)) => {
+                            // The iterator is only taking valid chars for numeric literals to the conversion will not fail
+                            let n: i64 = source[start_index..=index].parse().unwrap();
+                            tokens.push(Token::Number(n));
+                        }
+                        _ => {
+                            return Err(Error {
+                                what: String::from("Invalid numeric literal"),
+                                line,
+                                column,
+                            })
+                        }
+                    }
                 }
                 ch if ch.is_alphabetic() => {}
                 _ => {
@@ -161,3 +212,6 @@ mod iterator {
             .map(|(_index, _char)| Token::Ampersand)
     }
 }
+
+// TODO (3) implement a lexer based on https://crates.io/crates/logos for performance comparison
+// See https://alic.dev/blog/fast-lexing
