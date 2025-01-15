@@ -75,7 +75,6 @@ pub struct Error {
 // Based on https://brunocalza.me/writing-a-simple-lexer-in-rust/
 mod manual_loop {
     use super::{Error, Token};
-    use std::iter::{self, from_fn};
 
     pub fn tokenize(source: &str) -> Result<Vec<Token>, Error> {
         let mut tokens: Vec<Token> = Vec::new();
@@ -171,7 +170,9 @@ mod manual_loop {
                         }
                     }
                 }
-                ch if ch.is_alphabetic() => {}
+                ch if ch.is_alphabetic() || ch == '_' => {
+                    // TODO add identifiers handling
+                }
                 _ => {
                     return Err(Error {
                         what: String::from("Syntax error"),
@@ -191,8 +192,17 @@ mod manual_loop {
         #[test]
         fn tokenizer() {
             let result = tokenize("Hello, world! This (is) a test != working");
-            // TODO intentionnally wrong
-            assert_eq!(result, Ok(vec![Token::Ampersand]));
+            assert_eq!(
+                result,
+                Ok(vec![
+                    Token::Comma,
+                    Token::Not,
+                    Token::LeftParen,
+                    Token::RightParen,
+                    Token::NotEqual,
+                    Token::Eof
+                ])
+            );
         }
     }
 }
