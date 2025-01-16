@@ -170,8 +170,8 @@ pub mod manual_loop {
                         }
                     }
                 }
-                ch if ch.is_alphabetic() || ch == '_' => {
-                    // TODO add identifiers handling
+                ch if is_identifier_char(ch) => {
+                    // TODO add identifiers and keywords handling
                 }
                 _ => {
                     return Err(Error {
@@ -184,6 +184,10 @@ pub mod manual_loop {
         }
         tokens.push(Token::Eof);
         Ok(tokens)
+    }
+
+    fn is_identifier_char(ch: char) -> bool {
+        ch.is_alphabetic() || ch == '_'
     }
 
     #[cfg(test)]
