@@ -57,6 +57,7 @@ fn run_from_stdin(is_interactive: IsInteractive) -> Result<(), exitcode::ExitCod
 
 fn run(program: &String) -> Result<(), exitcode::ExitCode> {
     println!("INFO: Running program '{}'", program);
+    _ = tokenizer::manual_loop::tokenize(program);
     Ok(())
 }
 

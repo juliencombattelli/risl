@@ -73,7 +73,7 @@ pub struct Error {
 // Pros: Interface is simple, implementation is verbose but simple
 // Cons: Vec<> usage is forced
 // Based on https://brunocalza.me/writing-a-simple-lexer-in-rust/
-mod manual_loop {
+pub mod manual_loop {
     use super::{Error, Token};
 
     pub fn tokenize(source: &str) -> Result<Vec<Token>, Error> {
@@ -212,7 +212,7 @@ mod manual_loop {
 // Pros: Only an iterator on the input is returned, the user can collect the
 //       tokens however he wants, implementation is more compact than (1)
 // Cons: Interface is a bit more complex than (1), but still easy to use
-mod iterator {
+pub mod iterator {
     use super::Error;
     use super::Token;
 
