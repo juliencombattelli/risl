@@ -1,5 +1,5 @@
 mod cli;
-mod tokenizer;
+mod parser;
 
 use std::fs;
 use std::io::{self, BufRead, ErrorKind, Write};
@@ -57,7 +57,7 @@ fn run_from_stdin(is_interactive: IsInteractive) -> Result<(), exitcode::ExitCod
 
 fn run(program: &String) -> Result<(), exitcode::ExitCode> {
     println!("INFO: Running program '{}'", program);
-    _ = tokenizer::manual_loop::tokenize(program);
+    _ = parser::lexer::lex(program).collect::<Vec<_>>();
     Ok(())
 }
 
