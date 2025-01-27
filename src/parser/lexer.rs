@@ -1,3 +1,29 @@
+pub type ByteIndex = u32;
+
+/// A span corresponding to a substring of the source file being parsed.
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub struct Span {
+    /// The start of the span in bytes.
+    pub start: ByteIndex,
+    /// The end of the span in bytes.
+    pub end: ByteIndex,
+}
+
+impl Span {
+    pub fn new<S, E>(start: S, end: E) -> Self
+    where
+        S: TryInto<ByteIndex>,
+        S::Error: std::fmt::Debug,
+        E: TryInto<ByteIndex>,
+        E::Error: std::fmt::Debug,
+    {
+        Self {
+            start: start.try_into().expect("start out of bounds"),
+            end: end.try_into().expect("end out of bounds"),
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum IntegerBase {
     Bin,
@@ -7,14 +33,14 @@ pub enum IntegerBase {
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub struct IntegerLiteral<'src> {
-    base: IntegerBase,
-    value: &'src str,
-    suffix: &'src str,
+pub struct IntegerLiteral {
+    pub base: IntegerBase,
+    pub value: Span,
+    pub suffix: Span,
 }
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-pub enum Token<'source> {
+pub enum Token {
     // Single-character tokens
     LeftParen,
     RightParen,
@@ -45,10 +71,10 @@ pub enum Token<'source> {
     DotDot,
     DotDotEqual,
     // Literals
-    Identifier(&'source str),
-    String(&'source str),
-    Integer(IntegerLiteral<'source>),
-    Float(&'source str),
+    Identifier(Span),
+    String(Span),
+    Integer(IntegerLiteral),
+    Float(Span),
     // Keywords
     And,
     Break,
@@ -77,7 +103,7 @@ pub enum Token<'source> {
     While,
     // Others
     Eof,
-    Err,
+    Err(char), // TODO group consecutive invalid tokens with Err(Span)
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -88,8 +114,8 @@ pub enum Error {
     FloatLiteralUnsupportedBase,
 }
 
-pub fn lex(source: &str) -> impl Iterator<Item = Token> {
-    let mut lexer = Lexer::new(source);
+pub fn lex(source: &str) -> impl Iterator<Item = Token> + use<'_> {
+    let mut lexer = Lexer::new(&source);
     std::iter::from_fn(move || lexer.next_token())
 }
 
@@ -208,16 +234,16 @@ impl<'src> Lexer<'src> {
     }
 
     /// Advance the cursor while the preficate is true and return the substring that was consumed
-    fn take_while(&mut self, predicate: impl FnMut(char) -> bool) -> &'src str {
+    fn take_while(&mut self, predicate: impl FnMut(char) -> bool) -> Span {
         let start = self.cursor.consumed;
         self.cursor.advance_while(predicate);
         let end = self.cursor.consumed;
-        &self.source[start..end]
+        Span::new(start, end)
     }
 
-    fn tokenize_identifier(&'src mut self) -> Token {
+    fn tokenize_identifier(&mut self) -> Token {
         let identifier = self.take_while(is_identifier_continuation);
-        Token::Identifier(&identifier)
+        Token::Identifier(identifier)
     }
 
     fn extract_number_base(&mut self, first_digit: char) -> IntegerBase {
@@ -242,7 +268,7 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn tokenize_number(&'src mut self, first_digit: char) -> Token {
+    fn tokenize_number(&mut self, first_digit: char) -> Token {
         let base = self.extract_number_base(first_digit);
         let value = self.take_while(is_digit_base16_continuation);
         let suffix = self.take_while(is_identifier_continuation);
@@ -254,8 +280,78 @@ impl<'src> Lexer<'src> {
         })
     }
 
-    fn next_token(&mut self) -> Option<Token<'src>> {
-        None
+    fn next_token(&mut self) -> Option<Token> {
+        loop {
+            if let Some(c) = self.cursor.next() {
+                let token = match c {
+                    c if c.is_whitespace() => {
+                        match c {
+                            '\n' => {
+                                // FIXME add file position handling
+                                // line += 1;
+                                // column = 1;
+                            }
+                            _ => {}
+                        };
+                        continue; // Skip whitespaces
+                    }
+                    // Single-character tokens
+                    '(' => Token::LeftParen,
+                    ')' => Token::RightParen,
+                    '{' => Token::LeftBrace,
+                    '}' => Token::RightBrace,
+                    '[' => Token::LeftBracket,
+                    ']' => Token::RightBracket,
+                    ',' => Token::Comma,
+                    '.' => Token::Dot,
+                    '-' => Token::Minus,
+                    '+' => Token::Plus,
+                    ':' => Token::Colon,
+                    ';' => Token::Semicolon,
+                    '/' => Token::Slash,
+                    '\\' => Token::Backslash,
+                    '*' => Token::Star,
+                    '&' => Token::Ampersand,
+                    '|' => Token::Pipe,
+                    // One or two character tokens
+                    '!' => match self.cursor.peek() {
+                        Some('=') => {
+                            self.cursor.next();
+                            Token::NotEqual
+                        }
+                        _ => Token::Not,
+                    },
+                    '=' => match self.cursor.peek() {
+                        Some('=') => {
+                            self.cursor.next();
+                            Token::EqualEqual
+                        }
+                        _ => Token::Equal,
+                    },
+                    '>' => match self.cursor.peek() {
+                        Some('=') => {
+                            self.cursor.next();
+                            Token::GreaterEqual
+                        }
+                        _ => Token::Greater,
+                    },
+                    '<' => match self.cursor.peek() {
+                        Some('=') => {
+                            self.cursor.next();
+                            Token::LessEqual
+                        }
+                        _ => Token::Less,
+                    },
+                    // Literals
+                    '1'..='9' => self.tokenize_number(c), // FIXME
+                    ch if ch.is_alphabetic() || ch == '_' => self.tokenize_identifier(), // FIXME
+                    _ => Token::Err(c),
+                };
+                return Some(token);
+            } else {
+                return None;
+            }
+        }
     }
 }
 
