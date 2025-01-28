@@ -619,6 +619,8 @@ mod manual_loop2 {
 }
 
 // TODO (2) implement an iterator adapter for &str (and String?)
+=> Done in risl crate
+=> Token are defined using index span to avoid lifetime issues with substring references
 // let tokens = "let answer = 42;".tokenize().collect::Vec<_>();
 // Pros: Only an iterator on the input is returned, the user can collect the
 //       tokens however he wants, implementation is more compact than (1)
@@ -636,46 +638,3 @@ mod iterator {
 
 // TODO (3) implement a lexer based on https://crates.io/crates/logos for performance comparison
 // See https://alic.dev/blog/fast-lexing
-
-// TODO (1.2) implement a Cursor class to ease movements in the input stream
-use std::str::Chars;
-
-const EOF_CHAR: char = '\0';
-
-struct Cursor<'src> {
-    chars: Chars<'src>,
-}
-
-impl<'src> Cursor<'src> {
-    pub fn new(input: &'src str) -> Cursor<'src> {
-        Cursor {
-            chars: input.chars(),
-        }
-    }
-
-    pub fn as_str(&self) -> &'src str {
-        self.chars.as_str()
-    }
-
-    pub fn peek(&self) -> char {
-        self.chars.clone().next().unwrap_or(EOF_CHAR)
-    }
-
-    pub fn peek_nth(&self, n: usize) -> char {
-        self.chars.clone().nth(n).unwrap_or(EOF_CHAR)
-    }
-
-    pub fn next(&mut self) -> Option<char> {
-        self.chars.next()
-    }
-
-    pub fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
-        while predicate(self.peek()) && !self.is_eof() {
-            self.next();
-        }
-    }
-
-    pub fn is_eof(&self) -> bool {
-        self.chars.as_str().is_empty()
-    }
-}

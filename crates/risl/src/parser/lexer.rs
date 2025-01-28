@@ -313,7 +313,7 @@ impl<'src> Lexer<'src> {
                     '*' => Token::Star,
                     '&' => Token::Ampersand,
                     '|' => Token::Pipe,
-                    // One or two character tokens
+                    // One or two characters tokens
                     '!' => match self.cursor.peek() {
                         Some('=') => {
                             self.cursor.next();
@@ -343,8 +343,9 @@ impl<'src> Lexer<'src> {
                         _ => Token::Less,
                     },
                     // Literals
-                    '1'..='9' => self.tokenize_number(c), // FIXME
-                    ch if ch.is_alphabetic() || ch == '_' => self.tokenize_identifier(), // FIXME
+                    '1'..='9' => self.tokenize_number(c),
+                    c if is_identifier_start(c) => self.tokenize_identifier(),
+                    // Gather unknown chars into an invalid token
                     _ => Token::Err(c),
                 };
                 return Some(token);
