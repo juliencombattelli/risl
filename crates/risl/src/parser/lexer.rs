@@ -201,23 +201,27 @@ fn is_whitespace(c: char) -> bool {
     c.is_whitespace()
 }
 
+fn is_digit_start(c: char) -> bool {
+    return c.is_ascii_digit();
+}
+
 // Only continuation variant exists to check digits as the start is checked in
 // the tokenizer big match statement
 
-fn is_digit_base10_continuation(ch: char) -> bool {
-    return ch.is_ascii_digit() || ch == '_';
+fn is_digit_base10_continuation(c: char) -> bool {
+    return c.is_ascii_digit() || c == '_';
 }
 
-fn is_digit_base2_continuation(ch: char) -> bool {
-    return ('0'..='1').contains(&ch) || ch == '_';
+fn is_digit_base2_continuation(c: char) -> bool {
+    return ('0'..='1').contains(&c) || c == '_';
 }
 
-fn is_digit_base8_continuation(ch: char) -> bool {
-    return ('0'..='7').contains(&ch) || ch == '_';
+fn is_digit_base8_continuation(c: char) -> bool {
+    return ('0'..='7').contains(&c) || c == '_';
 }
 
-fn is_digit_base16_continuation(ch: char) -> bool {
-    return ch.is_ascii_hexdigit() || ch == '_';
+fn is_digit_base16_continuation(c: char) -> bool {
+    return c.is_ascii_hexdigit() || c == '_';
 }
 
 struct Lexer<'src> {
@@ -246,35 +250,40 @@ impl<'src> Lexer<'src> {
         Token::Identifier(identifier)
     }
 
-    fn extract_number_base(&mut self, first_digit: char) -> IntegerBase {
+    fn extract_number_base(&mut self, first_digit: char) -> Option<IntegerBase> {
         if first_digit == '0' {
             match self.cursor.peek() {
                 Some('b') => {
                     self.cursor.next();
-                    IntegerBase::Bin
+                    Some(IntegerBase::Bin)
                 }
                 Some('o') => {
                     self.cursor.next();
-                    IntegerBase::Oct
+                    Some(IntegerBase::Oct)
                 }
                 Some('x') => {
                     self.cursor.next();
-                    IntegerBase::Hex
+                    Some(IntegerBase::Hex)
                 }
-                _ => IntegerBase::Dec,
+                _ => None,
             }
         } else {
-            IntegerBase::Dec
+            None
         }
     }
 
     fn tokenize_number(&mut self, first_digit: char) -> Token {
+        debug_assert!(is_digit_start(first_digit));
         let base = self.extract_number_base(first_digit);
-        let value = self.take_while(is_digit_base16_continuation);
+        let mut value = self.take_while(is_digit_base16_continuation);
+        if base.is_none() {
+            // Include first_digit if this is not the first char of the base (the 0 in 0b, 0o or 0x)
+            // Its size is always one byte as 0..=9 are ascii characters
+            value.start -= 1;
+        }
         let suffix = self.take_while(is_identifier_continuation);
-
         Token::Integer(IntegerLiteral {
-            base,
+            base: base.unwrap_or(IntegerBase::Dec),
             value,
             suffix,
         })
@@ -343,7 +352,7 @@ impl<'src> Lexer<'src> {
                         _ => Token::Less,
                     },
                     // Literals
-                    '1'..='9' => self.tokenize_number(c),
+                    c if is_digit_start(c) => self.tokenize_number(c),
                     c if is_identifier_start(c) => self.tokenize_identifier(),
                     // Gather unknown chars into an invalid token
                     _ => Token::Err(c),
