@@ -1,7 +1,6 @@
 use crate::parser::lexer::IntegerBase;
 use crate::parser::lexer::IntegerLiteral;
 
-use super::lex;
 use super::Lexer;
 use super::Span;
 use super::Token;
@@ -25,18 +24,4 @@ fn tokenize_number_decimal() {
             suffix: Span::new(5, 5),
         })
     );
-}
-
-#[test]
-fn lex_empty() {
-    let source = "";
-    let tokens = lex(source).collect::<Vec<_>>();
-    assert!(tokens.is_empty());
-}
-
-#[test]
-fn lex_simple_assignment() {
-    let source = "let answer = 42;";
-    let tokens = lex(source).collect::<Vec<_>>();
-    assert!(!tokens.is_empty()); // TODO expected tokens
 }

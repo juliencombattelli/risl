@@ -1,0 +1,11 @@
+[package]
+name = "risl-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+exitcode = "1.1.2"
+risl = { version = "0.1.0", path = "../risl" }
+
+[[bin]]
+name = "risl"

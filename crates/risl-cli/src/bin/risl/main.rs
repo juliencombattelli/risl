@@ -1,11 +1,8 @@
-mod cli;
-mod parser;
-
 use std::fs;
 use std::io::{self, BufRead, ErrorKind, Write};
 
-use crate::cli::args::Args;
-use crate::cli::error::Error;
+use risl::cli::args::Args;
+use risl::cli::error::Error;
 
 fn run_file(path: &String) -> Result<(), exitcode::ExitCode> {
     let program = match fs::read_to_string(path) {
@@ -57,7 +54,7 @@ fn run_from_stdin(is_interactive: IsInteractive) -> Result<(), exitcode::ExitCod
 
 fn run(program: &String) -> Result<(), exitcode::ExitCode> {
     println!("INFO: Running program '{}'", program);
-    _ = parser::lexer::lex(program).collect::<Vec<_>>();
+    _ = risl::parser::lexer::lex(program).collect::<Vec<_>>();
     Ok(())
 }
 
