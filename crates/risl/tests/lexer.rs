@@ -4,7 +4,7 @@ use risl::parser::lexer::{lex, IntegerBase, IntegerLiteral, Span, Token};
 fn lex_empty() {
     let source = "";
     let tokens = lex(source).collect::<Vec<_>>();
-    assert_eq!(tokens, vec![Token::Eof]);
+    assert_eq!(tokens, vec![]);
 }
 
 #[test]
@@ -23,7 +23,6 @@ fn lex_simple_assignment() {
                 suffix: Span::new(15, 15),
             }),
             Token::Semicolon,
-            Token::Eof,
         ]
     );
 }
@@ -32,7 +31,7 @@ fn lex_simple_assignment() {
 fn lex_invalid() {
     let source = "@@@@@";
     let tokens = lex(source).collect::<Vec<_>>();
-    assert_eq!(tokens, vec![Token::Err(Span::new(0, 5)), Token::Eof]);
+    assert_eq!(tokens, vec![Token::Err(Span::new(0, 5))]);
 }
 
 #[test]
@@ -45,7 +44,6 @@ fn lex_ident_then_invalid_then_ident() {
             Token::Identifier(Span::new(0, 5)),
             Token::Err(Span::new(5, 10)),
             Token::Identifier(Span::new(10, 15)),
-            Token::Eof,
         ]
     );
 }

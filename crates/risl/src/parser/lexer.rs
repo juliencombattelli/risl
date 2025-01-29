@@ -102,8 +102,8 @@ pub enum Token {
     True,
     While,
     // Others
-    Eof,
     Err(Span),
+    Whitespace,
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -228,7 +228,6 @@ struct Lexer<'src> {
     source: &'src str,
     cursor: Cursor<'src>,
     pending_token: Option<Token>,
-    eof_reached: bool,
 }
 
 impl<'src> Lexer<'src> {
@@ -237,7 +236,6 @@ impl<'src> Lexer<'src> {
             source,
             cursor: Cursor::new(source),
             pending_token: None,
-            eof_reached: false,
         }
     }
 
@@ -296,110 +294,125 @@ impl<'src> Lexer<'src> {
         })
     }
 
+    fn skip_whitespaces(&mut self, first_ws: char) {
+        let mut c = first_ws;
+        loop {
+            match c {
+                '\n' => {
+                    // FIXME add file position handling
+                    // line += 1;
+                    // column = 1;
+                }
+                _ => {}
+            }
+            match self.cursor.peek() {
+                Some(next) if next.is_whitespace() => {
+                    c = next;
+                    self.cursor.next();
+                    continue;
+                }
+                _ => break,
+            }
+        }
+    }
+
+    /// Take the current character and advance the cursor until a token is found
+    fn parse_token(&mut self, c: char) -> Token {
+        match c {
+            c if c.is_whitespace() => {
+                self.skip_whitespaces(c);
+                Token::Whitespace
+            }
+            // Single-character tokens
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
+            '{' => Token::LeftBrace,
+            '}' => Token::RightBrace,
+            '[' => Token::LeftBracket,
+            ']' => Token::RightBracket,
+            ',' => Token::Comma,
+            '.' => Token::Dot,
+            '-' => Token::Minus,
+            '+' => Token::Plus,
+            ':' => Token::Colon,
+            ';' => Token::Semicolon,
+            '/' => Token::Slash,
+            '\\' => Token::Backslash,
+            '*' => Token::Star,
+            '&' => Token::Ampersand,
+            '|' => Token::Pipe,
+            // One or two characters tokens
+            '!' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.next();
+                    Token::NotEqual
+                }
+                _ => Token::Not,
+            },
+            '=' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.next();
+                    Token::EqualEqual
+                }
+                _ => Token::Equal,
+            },
+            '>' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.next();
+                    Token::GreaterEqual
+                }
+                _ => Token::Greater,
+            },
+            '<' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.next();
+                    Token::LessEqual
+                }
+                _ => Token::Less,
+            },
+            // Literals
+            c if is_digit_start(c) => self.tokenize_number(c),
+            c if is_identifier_start(c) => self.tokenize_identifier(c),
+            // Unknown characters
+            _ => Token::Err(Span::new(self.cursor.consumed - 1, self.cursor.consumed)),
+        }
+    }
+
+    fn accumulate_invalid_span_into(invalid_token_span: &mut Option<Span>, span: Span) {
+        if let Some(ref mut span) = invalid_token_span {
+            span.end += 1
+        } else {
+            *invalid_token_span = Some(span)
+        }
+    }
+
     fn next_token(&mut self) -> Option<Token> {
-        if self.pending_token.is_some() {
-            let pending_token = self.pending_token;
-            self.pending_token = None;
-            return pending_token;
-        } else if self.eof_reached {
-            return None;
+        if let Some(_) = self.pending_token {
+            return self.pending_token.take();
         }
         let mut invalid_token_span: Option<Span> = None;
         loop {
-            if let Some(c) = self.cursor.next() {
-                let token = match c {
-                    c if c.is_whitespace() => {
-                        match c {
-                            '\n' => {
-                                // FIXME add file position handling
-                                // line += 1;
-                                // column = 1;
-                            }
-                            _ => {}
-                        };
-                        continue; // Skip whitespaces
-                    }
-                    // Single-character tokens
-                    '(' => Token::LeftParen,
-                    ')' => Token::RightParen,
-                    '{' => Token::LeftBrace,
-                    '}' => Token::RightBrace,
-                    '[' => Token::LeftBracket,
-                    ']' => Token::RightBracket,
-                    ',' => Token::Comma,
-                    '.' => Token::Dot,
-                    '-' => Token::Minus,
-                    '+' => Token::Plus,
-                    ':' => Token::Colon,
-                    ';' => Token::Semicolon,
-                    '/' => Token::Slash,
-                    '\\' => Token::Backslash,
-                    '*' => Token::Star,
-                    '&' => Token::Ampersand,
-                    '|' => Token::Pipe,
-                    // One or two characters tokens
-                    '!' => match self.cursor.peek() {
-                        Some('=') => {
-                            self.cursor.next();
-                            Token::NotEqual
+            match self.cursor.next() {
+                Some(c) => {
+                    let token = match self.parse_token(c) {
+                        Token::Whitespace => continue,
+                        Token::Err(span) => {
+                            Self::accumulate_invalid_span_into(&mut invalid_token_span, span);
+                            continue;
                         }
-                        _ => Token::Not,
-                    },
-                    '=' => match self.cursor.peek() {
-                        Some('=') => {
-                            self.cursor.next();
-                            Token::EqualEqual
-                        }
-                        _ => Token::Equal,
-                    },
-                    '>' => match self.cursor.peek() {
-                        Some('=') => {
-                            self.cursor.next();
-                            Token::GreaterEqual
-                        }
-                        _ => Token::Greater,
-                    },
-                    '<' => match self.cursor.peek() {
-                        Some('=') => {
-                            self.cursor.next();
-                            Token::LessEqual
-                        }
-                        _ => Token::Less,
-                    },
-                    // Literals
-                    c if is_digit_start(c) => self.tokenize_number(c),
-                    c if is_identifier_start(c) => self.tokenize_identifier(c),
-                    // Gather unknown chars into an invalid token
-                    _ => {
-                        match invalid_token_span {
-                            Some(ref mut span) => span.end += 1,
-                            None => {
-                                invalid_token_span =
-                                    Some(Span::new(self.cursor.consumed - 1, self.cursor.consumed))
+                        token => {
+                            if let Some(span) = invalid_token_span {
+                                self.pending_token = Some(token);
+                                Token::Err(span)
+                            } else {
+                                token
                             }
                         }
-                        continue;
-                    }
-                };
-                if let Some(span) = invalid_token_span {
-                    match token {
-                        Token::Err(_) => (),
-                        _ => {
-                            // Save current valid token for next iteration and
-                            // return immediately the invalid one
-                            self.pending_token = Some(token);
-                            return Some(Token::Err(span));
-                        }
-                    }
+                    };
+                    return Some(token);
                 }
-                return Some(token);
-            } else {
-                self.eof_reached = true;
-                if let Some(span) = invalid_token_span {
-                    self.pending_token = Some(Token::Eof);
-                    return Some(Token::Err(span));
-                } else {
-                    return Some(Token::Eof);
+                None => {
+                    return invalid_token_span.and_then(|span| Some(Token::Err(span)));
                 }
             }
         }
