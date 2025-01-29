@@ -24,6 +24,27 @@ impl Span {
     }
 }
 
+trait SpanMerger {
+    fn merge(&mut self, span: Span);
+}
+
+impl SpanMerger for Span {
+    fn merge(&mut self, span: Span) {
+        debug_assert!(self.end < span.end);
+        self.end = span.end
+    }
+}
+
+impl SpanMerger for Option<Span> {
+    fn merge(&mut self, span: Span) {
+        if let Some(ref mut self_span) = self {
+            self_span.merge(span)
+        } else {
+            *self = Some(span)
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum IntegerBase {
     Bin,
@@ -378,15 +399,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    // TODO Define a SpanConcatenator trait implemented for Span and Option<Span>
-    fn accumulate_invalid_span_into(invalid_token_span: &mut Option<Span>, span: Span) {
-        if let Some(ref mut output_span) = invalid_token_span {
-            output_span.end = span.end
-        } else {
-            *invalid_token_span = Some(span)
-        }
-    }
-
     fn next_token(&mut self) -> Option<Token> {
         if let Some(_) = self.pending_token {
             return self.pending_token.take();
@@ -398,7 +410,7 @@ impl<'src> Lexer<'src> {
                     let token = match self.parse_token(c) {
                         Token::Whitespace => continue,
                         Token::Err(span) => {
-                            Self::accumulate_invalid_span_into(&mut invalid_token_span, span);
+                            invalid_token_span.merge(span);
                             continue;
                         }
                         token => {
