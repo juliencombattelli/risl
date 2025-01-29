@@ -103,7 +103,7 @@ pub enum Token {
     While,
     // Others
     Eof,
-    Err(char), // TODO group consecutive invalid tokens with Err(Span)
+    Err(Span),
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -227,6 +227,8 @@ fn is_digit_base16_continuation(c: char) -> bool {
 struct Lexer<'src> {
     source: &'src str,
     cursor: Cursor<'src>,
+    pending_token: Option<Token>,
+    eof_reached: bool,
 }
 
 impl<'src> Lexer<'src> {
@@ -234,6 +236,8 @@ impl<'src> Lexer<'src> {
         Self {
             source,
             cursor: Cursor::new(source),
+            pending_token: None,
+            eof_reached: false,
         }
     }
 
@@ -245,8 +249,11 @@ impl<'src> Lexer<'src> {
         Span::new(start, end)
     }
 
-    fn tokenize_identifier(&mut self) -> Token {
-        let identifier = self.take_while(is_identifier_continuation);
+    fn tokenize_identifier(&mut self, first_char: char) -> Token {
+        let mut identifier = self.take_while(is_identifier_continuation);
+        // Add the first char of the identifier already consumed
+        // Unwraping here is safe as char::len_utf8() is always between 1 and 4 inclusive
+        identifier.start -= u32::try_from(first_char.len_utf8()).unwrap();
         Token::Identifier(identifier)
     }
 
@@ -290,6 +297,14 @@ impl<'src> Lexer<'src> {
     }
 
     fn next_token(&mut self) -> Option<Token> {
+        if self.pending_token.is_some() {
+            let pending_token = self.pending_token;
+            self.pending_token = None;
+            return pending_token;
+        } else if self.eof_reached {
+            return None;
+        }
+        let mut invalid_token_span: Option<Span> = None;
         loop {
             if let Some(c) = self.cursor.next() {
                 let token = match c {
@@ -353,13 +368,39 @@ impl<'src> Lexer<'src> {
                     },
                     // Literals
                     c if is_digit_start(c) => self.tokenize_number(c),
-                    c if is_identifier_start(c) => self.tokenize_identifier(),
+                    c if is_identifier_start(c) => self.tokenize_identifier(c),
                     // Gather unknown chars into an invalid token
-                    _ => Token::Err(c),
+                    _ => {
+                        match invalid_token_span {
+                            Some(ref mut span) => span.end += 1,
+                            None => {
+                                invalid_token_span =
+                                    Some(Span::new(self.cursor.consumed - 1, self.cursor.consumed))
+                            }
+                        }
+                        continue;
+                    }
                 };
+                if let Some(span) = invalid_token_span {
+                    match token {
+                        Token::Err(_) => (),
+                        _ => {
+                            // Save current valid token for next iteration and
+                            // return immediately the invalid one
+                            self.pending_token = Some(token);
+                            return Some(Token::Err(span));
+                        }
+                    }
+                }
                 return Some(token);
             } else {
-                return None;
+                self.eof_reached = true;
+                if let Some(span) = invalid_token_span {
+                    self.pending_token = Some(Token::Eof);
+                    return Some(Token::Err(span));
+                } else {
+                    return Some(Token::Eof);
+                }
             }
         }
     }

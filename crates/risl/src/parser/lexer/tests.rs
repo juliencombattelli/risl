@@ -8,7 +8,8 @@ use super::Token;
 #[test]
 fn tokenize_identifier() {
     let mut lexer = Lexer::new("Hello other");
-    let result = lexer.tokenize_identifier();
+    let first_char = lexer.cursor.next().unwrap();
+    let result = lexer.tokenize_identifier(first_char);
     assert_eq!(result, Token::Identifier(Span::new(0, 5)));
 }
 
