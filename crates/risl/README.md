@@ -1,5 +1,7 @@
 # Risl - Rust-Inspired Scripting Language
 
+[![Linux Build & Test](https://github.com/juliencombattelli/risl/actions/workflows/linux.yml/badge.svg)](https://github.com/juliencombattelli/risl/actions/workflows/linux.yml)
+
 A scripting language with a syntax similar to Rust and an interpreter written
 in Rust.
 
