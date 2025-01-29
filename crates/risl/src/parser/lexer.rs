@@ -378,9 +378,10 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    // TODO Define a SpanConcatenator trait implemented for Span and Option<Span>
     fn accumulate_invalid_span_into(invalid_token_span: &mut Option<Span>, span: Span) {
-        if let Some(ref mut span) = invalid_token_span {
-            span.end += 1
+        if let Some(ref mut output_span) = invalid_token_span {
+            output_span.end = span.end
         } else {
             *invalid_token_span = Some(span)
         }
