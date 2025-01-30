@@ -339,6 +339,7 @@ impl<'src> Lexer<'src> {
     /// Take the current character and advance the cursor until a token is found
     fn parse_token(&mut self, c: char) -> Token {
         match c {
+            // Whitespaces
             c if c.is_whitespace() => {
                 self.skip_whitespaces(c);
                 Token::Whitespace
@@ -407,13 +408,16 @@ impl<'src> Lexer<'src> {
             match self.cursor.next() {
                 Some(c) => {
                     let token = match self.parse_token(c) {
-                        Token::Whitespace => continue,
+                        Token::Whitespace => continue, // Skip whitespaces
                         Token::Err(span) => {
+                            // Group consecutive unknown characters
                             invalid_token_span.merge(span);
                             continue;
                         }
                         token => {
                             if let Some(span) = invalid_token_span {
+                                // Invalid token extracted at previous iteration
+                                // Return it and save current valid token for the next iteration
                                 self.pending_token = Some(token);
                                 Token::Err(span)
                             } else {
@@ -424,6 +428,8 @@ impl<'src> Lexer<'src> {
                     return Some(token);
                 }
                 None => {
+                    // If EOF is reached and an invalid token is pending return it now
+                    // The final None will be returned on next iteration
                     return invalid_token_span.and_then(|span| Some(Token::Err(span)));
                 }
             }
