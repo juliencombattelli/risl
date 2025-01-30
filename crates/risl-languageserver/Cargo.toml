@@ -1,2 +1,3 @@
 [package]
 name = "risl-languageserver"
+edition = "2021"

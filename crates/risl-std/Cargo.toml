@@ -1,2 +1,3 @@
 [package]
 name = "risl-std"
+edition = "2021"
