@@ -330,7 +330,6 @@ impl<'src> Lexer<'src> {
                 Some(next) if next.is_whitespace() => {
                     c = next;
                     self.cursor.next();
-                    continue;
                 }
                 _ => break,
             }
