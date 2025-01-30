@@ -9,7 +9,7 @@ fn lex_empty() {
 
 #[test]
 fn lex_simple_assignment() {
-    let source = "let answer = 42;";
+    let source = "let answer =   42;";
     let tokens = lex(source).collect::<Vec<_>>();
     assert_eq!(
         tokens,
@@ -19,8 +19,8 @@ fn lex_simple_assignment() {
             Token::Equal,
             Token::Integer(IntegerLiteral {
                 base: IntegerBase::Dec,
-                value: Span::new(13, 15),
-                suffix: Span::new(15, 15),
+                value: Span::new(15, 17),
+                suffix: Span::new(17, 17),
             }),
             Token::Semicolon,
         ]
