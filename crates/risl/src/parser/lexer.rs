@@ -1,50 +1,7 @@
-pub type ByteIndex = u32;
+use super::span::Span;
+use super::span::SpanMerger;
 
-/// A span corresponding to a substring of the source file being parsed.
-#[derive(PartialEq, Debug, Copy, Clone)]
-pub struct Span {
-    /// The start of the span in bytes.
-    pub start: ByteIndex,
-    /// The end of the span in bytes.
-    pub end: ByteIndex,
-}
-
-impl Span {
-    pub fn new<S, E>(start: S, end: E) -> Self
-    where
-        S: TryInto<ByteIndex>,
-        S::Error: std::fmt::Debug,
-        E: TryInto<ByteIndex>,
-        E::Error: std::fmt::Debug,
-    {
-        Self {
-            start: start.try_into().expect("start out of bounds"),
-            end: end.try_into().expect("end out of bounds"),
-        }
-    }
-}
-
-trait SpanMerger {
-    fn merge(&mut self, span: Span);
-}
-
-impl SpanMerger for Span {
-    fn merge(&mut self, span: Span) {
-        debug_assert!(self.end < span.end);
-        self.end = span.end
-    }
-}
-
-impl SpanMerger for Option<Span> {
-    fn merge(&mut self, span: Span) {
-        if let Some(ref mut self_span) = self {
-            self_span.merge(span)
-        } else {
-            *self = Some(span)
-        }
-    }
-}
-
+/// The integer literal numeric bases supported by the Risl language.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum IntegerBase {
     Bin,
@@ -53,6 +10,7 @@ pub enum IntegerBase {
     Hex,
 }
 
+/// The data for an lexed integer literal with its value and suffix if any, and its base.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub struct IntegerLiteral {
     pub base: IntegerBase,
@@ -60,6 +18,7 @@ pub struct IntegerLiteral {
     pub suffix: Span,
 }
 
+/// The tokens supported by the Risl language.
 #[derive(PartialEq, Debug, Copy, Clone)]
 pub enum Token {
     // Single-character tokens
@@ -123,24 +82,27 @@ pub enum Token {
     True,
     While,
     // Others
-    Err(Span),
     Whitespace,
+    Err(Span),
 }
 
+/// The error type from the lexer raised for diagnostic purposes.
 #[derive(Eq, PartialEq, Debug)]
 pub enum Error {
+    UnknownToken,
     NoDigitLiteral,
     InvalidDigitLiteral,
     EmptyExponentFloat,
     FloatLiteralUnsupportedBase,
 }
 
+/// Iterates over the lexed tokens in the given source file.
 pub fn lex(source: &str) -> impl Iterator<Item = Token> + use<'_> {
     let mut lexer = Lexer::new(&source);
     std::iter::from_fn(move || lexer.next_token())
 }
 
-/// Provide basic iteration capabilities over an unicode character sequence
+/// A basic cursor providing iteration capabilities over an unicode character sequence.
 #[derive(Debug)]
 struct Cursor<'src> {
     chars: std::str::Chars<'src>,
@@ -148,29 +110,31 @@ struct Cursor<'src> {
 }
 
 impl<'src> Cursor<'src> {
-    fn new(input: &'src str) -> Self {
+    /// Creates a new cursor for the given source string.
+    fn new(source: &'src str) -> Self {
         Self {
-            chars: input.chars(),
+            chars: source.chars(),
             consumed: 0,
         }
     }
 
+    /// Returns the remaining string.
     fn as_str(&self) -> &'src str {
         self.chars.as_str()
     }
 
-    /// Peek the next next character, if any
+    /// Peeks the next next character, if any.
     fn peek(&self) -> Option<char> {
         self.chars.clone().next()
     }
 
-    /// Peek the n-th next character, if any
+    /// Peeks the n-th next character, if any.
     fn peek_nth(&self, n: usize) -> Option<char> {
         self.chars.clone().nth(n)
     }
 
-    /// Move to the next character
-    /// Does not move the cursor if the next character does not exist
+    /// Moves to the next character.
+    /// Does not move the cursor if the next character does not exist.
     fn next(&mut self) -> Option<char> {
         let next = self.chars.next();
         if let Some(_) = next {
@@ -179,8 +143,8 @@ impl<'src> Cursor<'src> {
         next
     }
 
-    /// Move to the n-th next character
-    /// Does not move the cursor if the n-th character does not exist
+    /// Moves to the n-th next character.
+    /// Does not move the cursor if the n-th character does not exist.
     fn next_nth(&mut self, n: usize) -> Option<char> {
         let nth = self.chars.nth(n);
         if let Some(_) = nth {
@@ -189,7 +153,7 @@ impl<'src> Cursor<'src> {
         nth
     }
 
-    /// Move to the next character while the predicate returns true for that character
+    /// Moves to the next character while the predicate returns true for that character.
     fn advance_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         loop {
             match self.peek() {
@@ -204,47 +168,48 @@ impl<'src> Cursor<'src> {
             }
         }
     }
-
-    // fn is_eof(&self) -> bool {
-    //     self.chars.as_str().is_empty()
-    // }
 }
 
+#[doc(hidden)]
 fn is_identifier_start(c: char) -> bool {
     unicode_ident::is_xid_start(c) || c == '_'
 }
 
+#[doc(hidden)]
 fn is_identifier_continuation(c: char) -> bool {
     unicode_ident::is_xid_continue(c) || c == '_'
 }
 
-fn is_whitespace(c: char) -> bool {
-    c.is_whitespace()
-}
-
+#[doc(hidden)]
 fn is_digit_start(c: char) -> bool {
+    // Start of number is always a character between 0 and 9
     return c.is_ascii_digit();
 }
 
-// Only continuation variant exists to check digits as the start is checked in
-// the tokenizer big match statement
+// Only continuation variants exist to check digits for a specific base as the
+// first digit will always be between 0 and 9
 
+#[doc(hidden)]
 fn is_digit_base10_continuation(c: char) -> bool {
     return c.is_ascii_digit() || c == '_';
 }
 
+#[doc(hidden)]
 fn is_digit_base2_continuation(c: char) -> bool {
     return ('0'..='1').contains(&c) || c == '_';
 }
 
+#[doc(hidden)]
 fn is_digit_base8_continuation(c: char) -> bool {
     return ('0'..='7').contains(&c) || c == '_';
 }
 
+#[doc(hidden)]
 fn is_digit_base16_continuation(c: char) -> bool {
     return c.is_ascii_hexdigit() || c == '_';
 }
 
+/// The lexer for the Risl language.
 struct Lexer<'src> {
     source: &'src str,
     cursor: Cursor<'src>,
@@ -252,6 +217,7 @@ struct Lexer<'src> {
 }
 
 impl<'src> Lexer<'src> {
+    /// Creates a lexer for the given source string.
     fn new(source: &'src str) -> Self {
         Self {
             source,
@@ -260,7 +226,7 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// Advance the cursor while the preficate is true and return the substring that was consumed
+    /// Advances the cursor while the predicate is true and returns the substring that was consumed.
     fn take_while(&mut self, predicate: impl FnMut(char) -> bool) -> Span {
         let start = self.cursor.consumed;
         self.cursor.advance_while(predicate);
@@ -268,6 +234,7 @@ impl<'src> Lexer<'src> {
         Span::new(start, end)
     }
 
+    /// Extracts the current identifier or keyword.
     fn tokenize_identifier(&mut self, first_char: char) -> Token {
         let mut identifier = self.take_while(is_identifier_continuation);
         // Add the first char of the identifier already consumed
@@ -276,6 +243,7 @@ impl<'src> Lexer<'src> {
         Token::Identifier(identifier)
     }
 
+    /// Extracts the base prefix for the current number and return it.
     fn extract_number_base(&mut self, first_digit: char) -> Option<IntegerBase> {
         if first_digit == '0' {
             match self.cursor.peek() {
@@ -298,6 +266,7 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Extracts a number literal, being an integer or a floating-point number.
     fn tokenize_number(&mut self, first_digit: char) -> Token {
         debug_assert!(is_digit_start(first_digit));
         let base = self.extract_number_base(first_digit);
@@ -315,6 +284,7 @@ impl<'src> Lexer<'src> {
         })
     }
 
+    /// Advances the cursor while whitespace are encountered.
     fn skip_whitespaces(&mut self, first_ws: char) {
         let mut c = first_ws;
         loop {
@@ -336,7 +306,7 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    /// Take the current character and advance the cursor until a token is found
+    /// Takes the current character and advance the cursor until a token is found.
     fn parse_token(&mut self, c: char) -> Token {
         match c {
             // Whitespaces
@@ -399,6 +369,8 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Returns the next token in the source file.
+    /// Returns None if the source file end is reached, iteration is not resumed.
     fn next_token(&mut self) -> Option<Token> {
         if let Some(_) = self.pending_token {
             return self.pending_token.take();
@@ -428,8 +400,8 @@ impl<'src> Lexer<'src> {
                     return Some(token);
                 }
                 None => {
-                    // If EOF is reached and an invalid token is pending return it now
-                    // The final None will be returned on next iteration
+                    // If EOF is reached and an invalid token is pending then return it now
+                    // If no invalid token is pending then None is returned immediately
                     return invalid_token_span.and_then(|span| Some(Token::Err(span)));
                 }
             }

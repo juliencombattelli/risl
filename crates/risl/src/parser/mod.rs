@@ -1,1 +1,3 @@
-pub mod lexer; // FIXME temporarily public to be used from main
+// FIXME temporarily public to be used from main
+pub mod lexer;
+pub mod span;

@@ -1,4 +1,5 @@
-use risl::parser::lexer::{lex, IntegerBase, IntegerLiteral, Span, Token};
+use risl::parser::lexer::{lex, IntegerBase, IntegerLiteral, Token};
+use risl::parser::span::Span;
 
 #[test]
 fn lex_empty() {
