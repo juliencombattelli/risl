@@ -47,3 +47,17 @@ fn lex_ident_then_invalid_then_ident() {
         ]
     );
 }
+
+#[test]
+fn lex_invalid_then_ident_then_invalid() {
+    let source = "@@@@@hello@@@@@";
+    let tokens = lex(source).collect::<Vec<_>>();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Err(Span::new(0, 5)),
+            Token::Identifier(Span::new(5, 10)),
+            Token::Err(Span::new(10, 15)),
+        ]
+    );
+}
