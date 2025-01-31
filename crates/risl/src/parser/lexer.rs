@@ -236,6 +236,7 @@ impl<'src> Lexer<'src> {
 
     /// Extracts the current identifier or keyword.
     fn tokenize_identifier(&mut self, first_char: char) -> Token {
+        debug_assert!(is_identifier_start(first_char));
         let mut identifier = self.take_while(is_identifier_continuation);
         // Add the first char of the identifier already consumed
         // Unwraping here is safe as char::len_utf8() is always between 1 and 4 inclusive
@@ -286,6 +287,7 @@ impl<'src> Lexer<'src> {
 
     /// Advances the cursor while whitespace are encountered.
     fn skip_whitespaces(&mut self, first_ws: char) {
+        debug_assert!(first_ws.is_whitespace());
         let mut c = first_ws;
         loop {
             match c {
