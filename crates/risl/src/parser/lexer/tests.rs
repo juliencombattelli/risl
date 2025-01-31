@@ -1,5 +1,6 @@
 use crate::parser::lexer::IntegerBase;
 use crate::parser::lexer::IntegerLiteral;
+use crate::parser::lexer::TokenStr;
 
 use super::Lexer;
 use super::Span;
@@ -132,3 +133,13 @@ fn tokenize_number_hexadecimal_with_suffix() {
         })
     );
 }
+
+// #[test]
+// fn tokenize_number_float() {
+//     let source = "0x123456.0E-3suffix other";
+//     let mut lexer = Lexer::new(source);
+//     let first_digit = lexer.cursor.next().unwrap();
+//     let result = lexer.tokenize_number(first_digit);
+//     println!("{}", TokenStr::new(result, source));
+//     assert_eq!(result, Token::Err(Span::new(0, 0)));
+// }

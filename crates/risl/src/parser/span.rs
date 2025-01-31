@@ -49,3 +49,13 @@ impl SpanMerger for Option<Span> {
         }
     }
 }
+
+pub trait SpanSubstr {
+    fn substr(&self, span: Span) -> &str;
+}
+
+impl SpanSubstr for &str {
+    fn substr(&self, span: Span) -> &str {
+        &self[(span.start as usize)..(span.end as usize)]
+    }
+}

@@ -1,5 +1,6 @@
 use super::span::Span;
 use super::span::SpanMerger;
+use super::span::SpanSubstr;
 
 /// The integer literal numeric bases supported by the Risl language.
 #[derive(PartialEq, Debug, Copy, Clone)]
@@ -15,6 +16,16 @@ pub enum IntegerBase {
 pub struct IntegerLiteral {
     pub base: IntegerBase,
     pub value: Span,
+    pub suffix: Span,
+}
+
+/// The data for an lexed float literal.
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub struct FloatLiteral {
+    pub base: IntegerBase,
+    pub integer_part: Span,
+    pub fractional_part: Span,
+    pub exponent: Span,
     pub suffix: Span,
 }
 
@@ -54,7 +65,7 @@ pub enum Token {
     Identifier(Span),
     String(Span),
     Integer(IntegerLiteral),
-    Float(Span),
+    Float(FloatLiteral),
     // Keywords
     And,
     Break,
@@ -84,6 +95,101 @@ pub enum Token {
     // Others
     Whitespace,
     Err(Span),
+}
+
+struct TokenStr<'src> {
+    token: Token,
+    source: &'src str,
+}
+
+impl<'src> TokenStr<'src> {
+    fn new(token: Token, source: &'src str) -> Self {
+        Self { token, source }
+    }
+}
+
+impl<'src> std::fmt::Display for TokenStr<'src> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let token = match self.token {
+            Token::LeftParen => "(",
+            Token::RightParen => ")",
+            Token::LeftBrace => "{",
+            Token::RightBrace => "}",
+            Token::LeftBracket => "[",
+            Token::RightBracket => "]",
+            Token::Comma => ",",
+            Token::Minus => "-",
+            Token::Plus => "+",
+            Token::Colon => ":",
+            Token::Semicolon => ";",
+            Token::Slash => "/",
+            Token::Backslash => "\\",
+            Token::Star => "*",
+            Token::Ampersand => "&",
+            Token::Pipe => "|",
+            Token::Not => "!",
+            Token::NotEqual => "!=",
+            Token::Equal => "=",
+            Token::EqualEqual => "==",
+            Token::Greater => ">",
+            Token::GreaterEqual => ">=",
+            Token::Less => "<",
+            Token::LessEqual => "<=",
+            Token::Dot => ".",
+            Token::DotDot => "..",
+            Token::DotDotEqual => "..=",
+            Token::Identifier(span) => self.source.substr(span),
+            Token::String(span) => self.source.substr(span),
+            Token::Integer(integer_literal) => {
+                return write!(
+                    f,
+                    "{:?}, '{}', '{}'",
+                    integer_literal.base,
+                    self.source.substr(integer_literal.value),
+                    self.source.substr(integer_literal.suffix),
+                );
+            }
+            Token::Float(float_literal) => {
+                return write!(
+                    f,
+                    "{{{:?}, '{}', '{}', '{}', '{}'}}",
+                    float_literal.base,
+                    self.source.substr(float_literal.integer_part),
+                    self.source.substr(float_literal.fractional_part),
+                    self.source.substr(float_literal.exponent),
+                    self.source.substr(float_literal.suffix),
+                );
+            }
+            Token::And => "and",
+            Token::Break => "break",
+            Token::Const => "const",
+            Token::Continue => "continue",
+            Token::Else => "else",
+            Token::Enum => "enum",
+            Token::False => "false",
+            Token::Fn => "fn",
+            Token::For => "for",
+            Token::If => "if",
+            Token::In => "in",
+            Token::Let => "let",
+            Token::Match => "match",
+            Token::Mut => "mut",
+            Token::Nil => "Nil",
+            Token::Or => "or",
+            Token::Pub => "pub",
+            Token::Return => "return",
+            Token::SelfValue => "self",
+            Token::SelfType => "Self",
+            Token::Struct => "struct",
+            Token::Super => "super",
+            Token::This => "this",
+            Token::True => "true",
+            Token::While => "while",
+            Token::Whitespace => " ",
+            Token::Err(span) => self.source.substr(span),
+        };
+        write!(f, "{token}")
+    }
 }
 
 /// The error type from the lexer raised for diagnostic purposes.
@@ -234,6 +340,10 @@ impl<'src> Lexer<'src> {
         Span::new(start, end)
     }
 
+    fn new_empty_span(&self) -> Span {
+        Span::new(self.cursor.consumed, self.cursor.consumed)
+    }
+
     /// Extracts the current identifier or keyword.
     fn tokenize_identifier(&mut self, first_char: char) -> Token {
         debug_assert!(is_identifier_start(first_char));
@@ -267,6 +377,21 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    fn extract_float_exponent(&mut self) -> Span {
+        let mut sign = false;
+        if let Some(c) = self.cursor.peek() {
+            if c == '-' || c == '+' {
+                self.cursor.next();
+                sign = true;
+            }
+        }
+        let mut exponent = self.take_while(is_digit_base10_continuation);
+        if sign {
+            exponent.start -= 1;
+        }
+        exponent
+    }
+
     /// Extracts a number literal, being an integer or a floating-point number.
     fn tokenize_number(&mut self, first_digit: char) -> Token {
         debug_assert!(is_digit_start(first_digit));
@@ -277,6 +402,31 @@ impl<'src> Lexer<'src> {
             // Its size is always one byte as 0..=9 are ascii characters
             value.start -= 1;
         }
+        if let Some('.') = self.cursor.peek() {
+            if let Some(c) = self.cursor.peek_nth(1) {
+                if c != '.' && !is_identifier_start(c) {
+                    self.cursor.next();
+                    let integer_part = value;
+                    let fractional_part = self.take_while(is_digit_base10_continuation);
+                    let exponent = if let Some('e' | 'E') = self.cursor.peek() {
+                        self.cursor.next();
+                        self.extract_float_exponent()
+                    } else {
+                        self.new_empty_span()
+                    };
+                    let suffix = self.take_while(is_identifier_continuation);
+                    return Token::Float(FloatLiteral {
+                        base: base.unwrap_or(IntegerBase::Dec),
+                        integer_part,
+                        fractional_part,
+                        exponent,
+                        suffix,
+                    });
+                }
+            }
+        }
+        // TODO add exponent handling when . is not present in number (ie. 10e2)
+
         let suffix = self.take_while(is_identifier_continuation);
         Token::Integer(IntegerLiteral {
             base: base.unwrap_or(IntegerBase::Dec),
