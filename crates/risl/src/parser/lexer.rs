@@ -427,9 +427,22 @@ impl<'src> Lexer<'src> {
                     });
                 }
             }
+        } else if base != IntegerBase::Hex {
+            if let Some('e' | 'E') = self.cursor.peek() {
+                self.cursor.next();
+                let integer_part = value;
+                let fractional_part = Span::new_empty(self.cursor.consumed);
+                let exponent = self.extract_float_exponent();
+                let suffix = self.take_while(is_identifier_continuation);
+                return Token::Float(FloatLiteral {
+                    base,
+                    integer_part,
+                    fractional_part,
+                    exponent,
+                    suffix,
+                });
+            }
         }
-        // TODO add exponent handling when . is not present in number (ie. 10e2)
-
         let suffix = self.take_while(is_identifier_continuation);
         Token::Integer(IntegerLiteral {
             base,

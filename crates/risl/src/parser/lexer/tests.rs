@@ -135,7 +135,7 @@ fn tokenize_number_hexadecimal_with_suffix() {
 }
 
 // #[test]
-// fn tokenize_number_float() {
+// fn tokenize_number_float_full() {
 //     let source = "0x123456.0E-3suffix other";
 //     let mut lexer = Lexer::new(source);
 //     let first_digit = lexer.cursor.next().unwrap();
@@ -143,3 +143,39 @@ fn tokenize_number_hexadecimal_with_suffix() {
 //     println!("{}", TokenStr::new(result, source));
 //     assert_eq!(result, Token::Err(Span::new(0, 0)));
 // }
+
+// #[test]
+// fn tokenize_number_float_integer_exponent() {
+//     let source = "123456E+2 other";
+//     let mut lexer = Lexer::new(source);
+//     let first_digit = lexer.cursor.next().unwrap();
+//     let result = lexer.tokenize_number(first_digit);
+//     println!("{}", TokenStr::new(result, source));
+//     assert_eq!(result, Token::Err(Span::new(0, 0)));
+// }
+
+// #[test]
+// fn tokenize_number_float_integer_exponent_with_base() {
+//     let source = "0b123456E2 other";
+//     let mut lexer = Lexer::new(source);
+//     let first_digit = lexer.cursor.next().unwrap();
+//     let result = lexer.tokenize_number(first_digit);
+//     println!("{}", TokenStr::new(result, source));
+//     assert_eq!(result, Token::Err(Span::new(0, 0)));
+// }
+
+#[test]
+fn tokenize_number_float_integer_exponent_with_hex_base() {
+    let source = "0x123456E2 other";
+    let mut lexer = Lexer::new(source);
+    let first_digit = lexer.cursor.next().unwrap();
+    let result = lexer.tokenize_number(first_digit);
+    assert_eq!(
+        result,
+        Token::Integer(IntegerLiteral {
+            base: IntegerBase::Hex,
+            value: Span::new(2, 10),
+            suffix: Span::new(10, 10),
+        })
+    );
+}
