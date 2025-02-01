@@ -1,10 +1,39 @@
 use crate::parser::lexer::FloatLiteral;
 use crate::parser::lexer::IntegerBase;
 use crate::parser::lexer::IntegerLiteral;
+use crate::parser::lexer::TokenStr;
 
 use super::Lexer;
 use super::Span;
 use super::Token;
+
+#[test]
+fn token_str_one_char() {
+    let source = "";
+    let token = TokenStr::new(Token::Ampersand, source);
+    assert_eq!(format!("{}", token), "&");
+}
+
+#[test]
+fn token_str_two_char() {
+    let source = "";
+    let token = TokenStr::new(Token::NotEqual, source);
+    assert_eq!(format!("{}", token), "!=");
+}
+
+#[test]
+fn token_str_three_char() {
+    let source = "";
+    let token = TokenStr::new(Token::DotDotEqual, source);
+    assert_eq!(format!("{}", token), "..=");
+}
+
+#[test]
+fn token_str_identifier() {
+    let source = "Hello, world!";
+    let token = TokenStr::new(Token::Identifier(Span::new(7, 12)), source);
+    assert_eq!(format!("{}", token), "world");
+}
 
 #[test]
 fn tokenize_identifier() {
