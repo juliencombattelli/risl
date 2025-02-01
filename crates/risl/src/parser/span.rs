@@ -27,6 +27,19 @@ impl Span {
             end: end.try_into().expect("end out of bounds"),
         }
     }
+
+    /// Creates an empty span at the given index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the passed byte indices cannot be stored in an u32.
+    pub fn new_empty<I>(index: I) -> Self
+    where
+        I: TryInto<ByteIndex> + Clone,
+        I::Error: std::fmt::Debug,
+    {
+        Self::new(index.clone(), index)
+    }
 }
 
 pub trait SpanMerger {

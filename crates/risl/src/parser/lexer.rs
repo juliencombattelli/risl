@@ -340,10 +340,6 @@ impl<'src> Lexer<'src> {
         Span::new(start, end)
     }
 
-    fn new_empty_span(&self) -> Span {
-        Span::new(self.cursor.consumed, self.cursor.consumed)
-    }
-
     /// Extracts the current identifier or keyword.
     fn tokenize_identifier(&mut self, first_char: char) -> Token {
         debug_assert!(is_identifier_start(first_char));
@@ -412,7 +408,7 @@ impl<'src> Lexer<'src> {
                         self.cursor.next();
                         self.extract_float_exponent()
                     } else {
-                        self.new_empty_span()
+                        Span::new_empty(self.cursor.consumed)
                     };
                     let suffix = self.take_while(is_identifier_continuation);
                     return Token::Float(FloatLiteral {
