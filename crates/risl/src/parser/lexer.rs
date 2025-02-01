@@ -391,13 +391,20 @@ impl<'src> Lexer<'src> {
     /// Extracts a number literal, being an integer or a floating-point number.
     fn tokenize_number(&mut self, first_digit: char) -> Token {
         debug_assert!(is_digit_start(first_digit));
-        let base = self.extract_number_base(first_digit);
-        let mut value = self.take_while(is_digit_base16_continuation);
-        if base.is_none() {
-            // Include first_digit if this is not the first char of the base (the 0 in 0b, 0o or 0x)
-            // Its size is always one byte as 0..=9 are ascii characters
-            value.start -= 1;
-        }
+        let (base, value) = match self.extract_number_base(first_digit) {
+            None => {
+                let mut value = self.take_while(is_digit_base10_continuation);
+                // Include first_digit if this is not the first char of the base (the 0 in 0b, 0o or 0x)
+                // Its size is always one byte as 0..=9 are ascii characters
+                value.start -= 1;
+                (IntegerBase::Dec, value)
+            }
+            Some(IntegerBase::Hex) => (
+                IntegerBase::Hex,
+                self.take_while(is_digit_base16_continuation),
+            ),
+            Some(base) => (base, self.take_while(is_digit_base10_continuation)),
+        };
         if let Some('.') = self.cursor.peek() {
             if let Some(c) = self.cursor.peek_nth(1) {
                 if c != '.' && !is_identifier_start(c) {
@@ -412,7 +419,7 @@ impl<'src> Lexer<'src> {
                     };
                     let suffix = self.take_while(is_identifier_continuation);
                     return Token::Float(FloatLiteral {
-                        base: base.unwrap_or(IntegerBase::Dec),
+                        base,
                         integer_part,
                         fractional_part,
                         exponent,
@@ -425,7 +432,7 @@ impl<'src> Lexer<'src> {
 
         let suffix = self.take_while(is_identifier_continuation);
         Token::Integer(IntegerLiteral {
-            base: base.unwrap_or(IntegerBase::Dec),
+            base,
             value,
             suffix,
         })
