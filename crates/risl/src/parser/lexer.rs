@@ -429,9 +429,9 @@ impl<'src> Lexer<'src> {
             }
         } else if base != IntegerBase::Hex {
             if let Some('e' | 'E') = self.cursor.peek() {
-                self.cursor.next();
                 let integer_part = value;
                 let fractional_part = Span::new_empty(self.cursor.consumed);
+                self.cursor.next();
                 let exponent = self.extract_float_exponent();
                 let suffix = self.take_while(is_identifier_continuation);
                 return Token::Float(FloatLiteral {
