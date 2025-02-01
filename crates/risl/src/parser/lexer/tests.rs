@@ -1,7 +1,7 @@
+use crate::parser::lexer::token::TokenStr;
 use crate::parser::lexer::FloatLiteral;
 use crate::parser::lexer::IntegerBase;
 use crate::parser::lexer::IntegerLiteral;
-use crate::parser::lexer::TokenStr;
 
 use super::Lexer;
 use super::Span;
