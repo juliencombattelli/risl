@@ -92,6 +92,8 @@ pub enum Token {
     While,
     // Others
     Whitespace,
+    LineComment(Span),
+    BlockComment(Span),
     Err(Span),
 }
 
@@ -184,6 +186,8 @@ impl<'src> std::fmt::Display for TokenStr<'src> {
             Token::True => "true",
             Token::While => "while",
             Token::Whitespace => " ",
+            Token::LineComment(span) => self.source.substr(span),
+            Token::BlockComment(span) => self.source.substr(span),
             Token::Err(span) => self.source.substr(span),
         };
         write!(f, "{token}")

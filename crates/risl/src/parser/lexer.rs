@@ -3,7 +3,7 @@ mod span;
 mod token;
 
 pub use span::Span;
-pub use token::{FloatLiteral, IntegerBase, IntegerLiteral, Token};
+pub use token::{FloatLiteral, IntegerBase, IntegerLiteral, Token, TokenStr};
 
 use cursor::Cursor;
 use span::SpanMerger;
@@ -61,6 +61,16 @@ fn is_digit_base8_continuation(c: char) -> bool {
 #[doc(hidden)]
 fn is_digit_base16_continuation(c: char) -> bool {
     return c.is_ascii_hexdigit() || c == '_';
+}
+
+#[doc(hidden)]
+fn is_newline(c: char) -> bool {
+    c == '\n'
+}
+
+#[doc(hidden)]
+fn is_not_newline(c: char) -> bool {
+    !is_newline(c)
 }
 
 /// The lexer for the Risl language.
@@ -204,13 +214,10 @@ impl<'src> Lexer<'src> {
         debug_assert!(first_ws.is_whitespace());
         let mut c = first_ws;
         loop {
-            match c {
-                '\n' => {
-                    // FIXME add file position handling
-                    // line += 1;
-                    // column = 1;
-                }
-                _ => {}
+            if is_newline(c) {
+                // TODO add file position handling for diagnostics
+                // line += 1;
+                // column = 1;
             }
             match self.cursor.peek() {
                 Some(next) if next.is_whitespace() => {
@@ -243,7 +250,18 @@ impl<'src> Lexer<'src> {
             '+' => Token::Plus,
             ':' => Token::Colon,
             ';' => Token::Semicolon,
-            '/' => Token::Slash,
+            '/' => match self.cursor.peek() {
+                Some('/') => {
+                    self.cursor.next();
+                    Token::LineComment(self.take_while(is_not_newline))
+                }
+                // TODO add block comment handling with recursive /* */
+                // Some('*') => {
+                //     self.cursor.next();
+                //     Token::BlockComment(Span::new_empty(self.cursor.consumed))
+                // }
+                _ => Token::Slash,
+            },
             '\\' => Token::Backslash,
             '*' => Token::Star,
             '&' => Token::Ampersand,
