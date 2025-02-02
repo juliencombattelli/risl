@@ -97,6 +97,12 @@ pub enum Token {
     Err(Span),
 }
 
+impl Token {
+    pub fn is_skippable(&self) -> bool {
+        matches!(self, Token::Whitespace)
+    }
+}
+
 pub struct TokenStr<'src> {
     token: Token,
     source: &'src str,

@@ -68,6 +68,73 @@ fn lex_line_comment() {
 }
 
 #[test]
+fn lex_block_comment_inline() {
+    let source = "let answer = /* the answer */ 42;";
+    let tokens = lex(source).collect::<Vec<_>>();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Identifier(Span::new(0, 3)),
+            Token::Identifier(Span::new(4, 10)),
+            Token::Equal,
+            Token::BlockComment(Span::new(15, 27)),
+            Token::Integer(IntegerLiteral {
+                base: IntegerBase::Dec,
+                value: Span::new(30, 32),
+                suffix: Span::new(32, 32),
+            }),
+            Token::Semicolon,
+        ]
+    );
+}
+
+#[test]
+fn lex_block_comment_inline_nested() {
+    let source = "let answer = /* /* the /**/ /* */ answer */*/ 42;";
+    let tokens = lex(source).collect::<Vec<_>>();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::Identifier(Span::new(0, 3)),
+            Token::Identifier(Span::new(4, 10)),
+            Token::Equal,
+            Token::BlockComment(Span::new(15, 43)),
+            Token::Integer(IntegerLiteral {
+                base: IntegerBase::Dec,
+                value: Span::new(46, 48),
+                suffix: Span::new(48, 48)
+            }),
+            Token::Semicolon
+        ]
+    );
+}
+
+#[test]
+fn lex_block_comment_multiline() {
+    let source = r"
+    /*
+     * The answer
+     */
+    let answer = 42;";
+    let tokens = lex(source).collect::<Vec<_>>();
+    assert_eq!(
+        tokens,
+        vec![
+            Token::BlockComment(Span::new(7, 31)),
+            Token::Identifier(Span::new(38, 41)),
+            Token::Identifier(Span::new(42, 48)),
+            Token::Equal,
+            Token::Integer(IntegerLiteral {
+                base: IntegerBase::Dec,
+                value: Span::new(51, 53),
+                suffix: Span::new(53, 53),
+            }),
+            Token::Semicolon,
+        ]
+    );
+}
+
+#[test]
 fn lex_invalid() {
     let source = "@@@@@";
     let tokens = lex(source).collect::<Vec<_>>();

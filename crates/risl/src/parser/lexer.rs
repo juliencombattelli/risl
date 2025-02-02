@@ -229,6 +229,31 @@ impl<'src> Lexer<'src> {
         }
     }
 
+    /// Advances the cursor until the matching closing comment markup is encountered.
+    fn advance_until_end_of_comment(&mut self) {
+        let mut nested_comment_level = 1;
+        while let Some(c) = self.cursor.next() {
+            match c {
+                '/' => {
+                    if let Some('*') = self.cursor.peek() {
+                        self.cursor.next();
+                        nested_comment_level += 1;
+                    }
+                }
+                '*' => {
+                    if let Some('/') = self.cursor.peek() {
+                        self.cursor.next();
+                        nested_comment_level -= 1;
+                    }
+                }
+                _ => (),
+            }
+            if nested_comment_level == 0 {
+                break;
+            }
+        }
+    }
+
     /// Takes the current character and advance the cursor until a token is found.
     fn parse_token(&mut self, c: char) -> Token {
         match c {
@@ -255,11 +280,13 @@ impl<'src> Lexer<'src> {
                     self.cursor.next();
                     Token::LineComment(self.take_while(is_not_newline))
                 }
-                // TODO add block comment handling with recursive /* */
-                // Some('*') => {
-                //     self.cursor.next();
-                //     Token::BlockComment(Span::new_empty(self.cursor.consumed))
-                // }
+                Some('*') => {
+                    self.cursor.next();
+                    let start = self.cursor.consumed;
+                    self.advance_until_end_of_comment();
+                    let end = self.cursor.consumed - 2; // Remove the last */
+                    Token::BlockComment(Span::new(start, end))
+                }
                 _ => Token::Slash,
             },
             '\\' => Token::Backslash,
@@ -314,7 +341,7 @@ impl<'src> Lexer<'src> {
             match self.cursor.next() {
                 Some(c) => {
                     let token = match self.parse_token(c) {
-                        Token::Whitespace => continue, // Skip whitespaces
+                        token if token.is_skippable() => continue,
                         Token::Err(span) => {
                             // Group consecutive unknown characters
                             invalid_token_span.merge(span);
