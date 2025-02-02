@@ -99,7 +99,10 @@ pub enum Token {
 
 impl Token {
     pub fn is_skippable(&self) -> bool {
-        matches!(self, Token::Whitespace)
+        matches!(
+            self,
+            Token::Whitespace | Token::LineComment(_) | Token::BlockComment(_)
+        )
     }
 }
 
