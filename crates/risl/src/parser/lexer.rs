@@ -5,6 +5,8 @@ mod token;
 pub use span::Span;
 pub use token::{FloatLiteral, IntegerBase, IntegerLiteral, Token, TokenStr};
 
+use super::context::ParseContext;
+
 use cursor::Cursor;
 use span::SpanMerger;
 
@@ -19,8 +21,11 @@ pub enum Error {
 }
 
 /// Iterates over the lexed tokens in the given source file.
-pub fn lex(source: &str) -> impl Iterator<Item = Token> + use<'_> {
-    let mut lexer = Lexer::new(&source);
+pub fn lex<'ctx, 'src>(
+    context: &'ctx ParseContext,
+    source: &'src str,
+) -> impl Iterator<Item = Token> + use<'ctx, 'src> {
+    let mut lexer = Lexer::new(&context, &source);
     std::iter::from_fn(move || lexer.next_token())
 }
 
@@ -74,16 +79,18 @@ fn is_not_newline(c: char) -> bool {
 }
 
 /// The lexer for the Risl language.
-struct Lexer<'src> {
+struct Lexer<'ctx, 'src> {
+    context: &'ctx ParseContext,
     source: &'src str,
     cursor: Cursor<'src>,
     pending_token: Option<Token>,
 }
 
-impl<'src> Lexer<'src> {
+impl<'ctx, 'src> Lexer<'ctx, 'src> {
     /// Creates a lexer for the given source string.
-    fn new(source: &'src str) -> Self {
+    fn new(context: &'ctx ParseContext, source: &'src str) -> Self {
         Self {
+            context,
             source,
             cursor: Cursor::new(source),
             pending_token: None,

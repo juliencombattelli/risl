@@ -1,3 +1,6 @@
+use crate::parser::context::ParseContext;
+use crate::parser::diagnostic::DiagContext;
+use crate::parser::emitter::new_emitter_none;
 use crate::parser::lexer::token::TokenStr;
 use crate::parser::lexer::FloatLiteral;
 use crate::parser::lexer::IntegerBase;
@@ -6,6 +9,10 @@ use crate::parser::lexer::IntegerLiteral;
 use super::Lexer;
 use super::Span;
 use super::Token;
+
+fn stubbed_parse_context() -> ParseContext {
+    ParseContext::new(DiagContext::new(new_emitter_none()))
+}
 
 #[test]
 fn token_str_one_char() {
@@ -37,7 +44,8 @@ fn token_str_identifier() {
 
 #[test]
 fn tokenize_identifier() {
-    let mut lexer = Lexer::new("Hello other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "Hello other");
     let first_char = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_identifier(first_char);
     assert_eq!(result, Token::Identifier(Span::new(0, 5)));
@@ -45,7 +53,8 @@ fn tokenize_identifier() {
 
 #[test]
 fn tokenize_number_decimal() {
-    let mut lexer = Lexer::new("123456 other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "123456 other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -60,7 +69,8 @@ fn tokenize_number_decimal() {
 
 #[test]
 fn tokenize_number_decimal_with_suffix() {
-    let mut lexer = Lexer::new("123456suffix other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "123456suffix other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -75,7 +85,8 @@ fn tokenize_number_decimal_with_suffix() {
 
 #[test]
 fn tokenize_number_binary() {
-    let mut lexer = Lexer::new("0b123456 other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "0b123456 other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -90,7 +101,8 @@ fn tokenize_number_binary() {
 
 #[test]
 fn tokenize_number_binary_with_suffix() {
-    let mut lexer = Lexer::new("0b123456suffix other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "0b123456suffix other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -105,7 +117,8 @@ fn tokenize_number_binary_with_suffix() {
 
 #[test]
 fn tokenize_number_octal() {
-    let mut lexer = Lexer::new("0o123456 other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "0o123456 other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -120,7 +133,8 @@ fn tokenize_number_octal() {
 
 #[test]
 fn tokenize_number_octal_with_suffix() {
-    let mut lexer = Lexer::new("0o123456suffix other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "0o123456suffix other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -135,7 +149,8 @@ fn tokenize_number_octal_with_suffix() {
 
 #[test]
 fn tokenize_number_hexadecimal() {
-    let mut lexer = Lexer::new("0x123456 other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "0x123456 other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -150,7 +165,8 @@ fn tokenize_number_hexadecimal() {
 
 #[test]
 fn tokenize_number_hexadecimal_with_suffix() {
-    let mut lexer = Lexer::new("0x123456suffix other");
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, "0x123456suffix other");
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -165,8 +181,9 @@ fn tokenize_number_hexadecimal_with_suffix() {
 
 #[test]
 fn tokenize_number_float_full() {
+    let context = stubbed_parse_context();
     let source = "0x123456.0E-3suffix other";
-    let mut lexer = Lexer::new(source);
+    let mut lexer = Lexer::new(&context, source);
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -184,7 +201,8 @@ fn tokenize_number_float_full() {
 #[test]
 fn tokenize_number_float_integer_exponent() {
     let source = "123456E+2 other";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -202,7 +220,8 @@ fn tokenize_number_float_integer_exponent() {
 #[test]
 fn tokenize_number_float_integer_exponent_with_base() {
     let source = "0b123456E2 other";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -220,7 +239,8 @@ fn tokenize_number_float_integer_exponent_with_base() {
 #[test]
 fn tokenize_number_float_integer_exponent_with_hex_base() {
     let source = "0x123456E2 other";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let first_digit = lexer.cursor.next().unwrap();
     let result = lexer.tokenize_number(first_digit);
     assert_eq!(
@@ -239,7 +259,8 @@ fn tokenize_line_comment() {
     let answer =   42; // this is a line comment
     let other_anwer = 43; // an other comment
     ";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let mut tokens = vec![];
     while let Some(c) = lexer.cursor.next() {
         match lexer.parse_token(c) {
@@ -279,7 +300,8 @@ fn tokenize_line_comment() {
 #[test]
 fn tokenize_block_comment_inline() {
     let source = "let answer = /* the answer */ 42;";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let mut tokens = vec![];
     while let Some(c) = lexer.cursor.next() {
         match lexer.parse_token(c) {
@@ -307,7 +329,8 @@ fn tokenize_block_comment_inline() {
 #[test]
 fn tokenize_block_comment_inline_nested() {
     let source = "let answer = /* /* the /**/ /* */ answer */*/ 42;";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let mut tokens = vec![];
     while let Some(c) = lexer.cursor.next() {
         match lexer.parse_token(c) {
@@ -339,7 +362,8 @@ fn tokenize_block_comment_multiline() {
      * The answer
      */
     let answer = 42;";
-    let mut lexer = Lexer::new(source);
+    let context = stubbed_parse_context();
+    let mut lexer = Lexer::new(&context, source);
     let mut tokens = vec![];
     while let Some(c) = lexer.cursor.next() {
         match lexer.parse_token(c) {

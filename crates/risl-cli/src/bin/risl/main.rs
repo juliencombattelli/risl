@@ -3,6 +3,9 @@ use std::io::{self, BufRead, ErrorKind, Write};
 
 use risl::cli::args::Args;
 use risl::cli::error::Error;
+use risl::parser::context::ParseContext;
+use risl::parser::diagnostic::DiagContext;
+use risl::parser::emitter::new_emitter_human_readable;
 
 fn run_file(path: &String) -> Result<(), exitcode::ExitCode> {
     let program = match fs::read_to_string(path) {
@@ -54,7 +57,8 @@ fn run_from_stdin(is_interactive: IsInteractive) -> Result<(), exitcode::ExitCod
 
 fn run(program: &String) -> Result<(), exitcode::ExitCode> {
     println!("INFO: Running program '{}'", program);
-    _ = risl::parser::lexer::lex(program).collect::<Vec<_>>();
+    let context = ParseContext::new(DiagContext::new(new_emitter_human_readable()));
+    _ = risl::parser::lexer::lex(&context, program).collect::<Vec<_>>();
     Ok(())
 }
 
